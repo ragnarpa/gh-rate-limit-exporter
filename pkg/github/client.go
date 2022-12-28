@@ -143,16 +143,5 @@ func (c *gitHubClient) RateLimits(ctx context.Context) ([]*RateLimit, error) {
 		}
 	}
 
-	// enrichedLimits := []*RateLimit{
-	// 	NewRateLimit(c.metadata, "core", limits.Core),
-	// 	NewRateLimit(c.metadata, "search", limits.Search),
-	// 	NewRateLimit(c.metadata, "graphql", limits.GraphQL),
-	// 	NewRateLimit(c.metadata, "scim", limits.SCIM),
-	// 	NewRateLimit(c.metadata, "source_import", limits.SourceImport),
-	// 	NewRateLimit(c.metadata, "code_scanning_upload", limits.CodeScanningUpload),
-	// 	NewRateLimit(c.metadata, "integration_manifest", limits.IntegrationManifest),
-	// 	NewRateLimit(c.metadata, "actions_runner_registration", limits.ActionsRunnerRegistration),
-	// }
-
 	return enrichedLimits, nil
 }
