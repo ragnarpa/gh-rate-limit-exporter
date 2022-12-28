@@ -12,13 +12,10 @@ import (
 	"go.uber.org/fx"
 )
 
-const (
-	Host = "localhost"
-	Port = "8080"
-)
+const Port = "8080"
 
 func NewHTTPServer(lc fx.Lifecycle, mux *http.ServeMux, log logger.Logger) *http.Server {
-	srv := &http.Server{Addr: Host + ":" + Port, Handler: mux}
+	srv := &http.Server{Addr: ":" + Port, Handler: mux}
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {

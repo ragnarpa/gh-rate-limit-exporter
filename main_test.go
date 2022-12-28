@@ -131,7 +131,7 @@ func findMetricByResource(resourceValue string, m []*io_prometheus_client.Metric
 }
 
 func getMetricFamilies(t *testing.T) []*io_prometheus_client.MetricFamily {
-	resp, err := http.Get("http://" + server.Host + ":" + server.Port + "/metrics")
+	resp, err := http.Get("http://localhost:" + server.Port + "/metrics")
 	if err != nil {
 		fatal(t, err)
 	}
