@@ -3,6 +3,7 @@ module github.com/ragnarpa/gh-rate-limit-exporter
 go 1.19
 
 require (
+	github.com/bradleyfalzon/ghinstallation/v2 v2.1.0
 	github.com/google/go-github/v48 v48.2.0
 	github.com/prometheus/client_model v0.3.0
 	github.com/prometheus/common v0.39.0
@@ -14,9 +15,9 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
+	github.com/golang-jwt/jwt/v4 v4.4.3 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/go-github/v29 v29.0.2 // indirect
+	github.com/google/go-github/v45 v45.2.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
@@ -32,13 +33,10 @@ require (
 )
 
 require (
-	github.com/bradleyfalzon/ghinstallation v1.1.1
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/prometheus/client_golang v1.14.0
 	github.com/spf13/afero v1.9.3
 	github.com/stretchr/testify v1.8.1
-	golang.org/x/crypto v0.0.0-20211108221036-ceb1ce70b4fa // indirect
+	golang.org/x/crypto v0.4.0 // indirect
 	golang.org/x/oauth2 v0.3.0
 )
-
-replace github.com/dgrijalva/jwt-go => github.com/golang-jwt/jwt/v4 v4.4.3
