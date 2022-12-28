@@ -173,9 +173,7 @@ func SUT(ctx context.Context, t *testing.T) *fx.App {
 	)
 
 	if err := app.Start(ctx); err != nil {
-		defer func() {
-			app.Stop(ctx)
-		}()
+		defer app.Stop(ctx)
 		fatal(t, err)
 	}
 
