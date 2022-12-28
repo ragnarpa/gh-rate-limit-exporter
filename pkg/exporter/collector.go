@@ -28,8 +28,8 @@ type (
 
 	rateLimitsServiceFactory struct {
 		instrumenter            Instrumenter
-		CreateHTTPClientWithPAT func(context.Context, github.PAT) *http.Client
-		CreateHTTPClientWithApp func(github.App) (*http.Client, error)
+		createHTTPClientWithPAT func(context.Context, github.PAT) *http.Client
+		createHTTPClientWithApp func(github.App) (*http.Client, error)
 	}
 )
 
@@ -49,15 +49,15 @@ type (
 func NewRateLimitsServiceFactory(p RateLimitsServiceFactoryParams) RateLimitsServiceFactory {
 	return &rateLimitsServiceFactory{
 		instrumenter:            p.Instrumenter,
-		CreateHTTPClientWithPAT: p.HttpClientWithPATFactory,
-		CreateHTTPClientWithApp: p.HttpClientWithAppFactory,
+		createHTTPClientWithPAT: p.HttpClientWithPATFactory,
+		createHTTPClientWithApp: p.HttpClientWithAppFactory,
 	}
 }
 
 func (f *rateLimitsServiceFactory) Create(ctx context.Context, c *Credential) (RateLimitsService, error) {
 	switch c.Type {
 	case GitHubApp:
-		client, err := f.CreateHTTPClientWithApp(c)
+		client, err := f.createHTTPClientWithApp(c)
 		if err != nil {
 			return nil, err
 		}
@@ -66,7 +66,7 @@ func (f *rateLimitsServiceFactory) Create(ctx context.Context, c *Credential) (R
 
 		return github.NewGitHubClientForApp(c, client), nil
 	case GitHubPAT:
-		base := f.CreateHTTPClientWithPAT(ctx, c)
+		base := f.createHTTPClientWithPAT(ctx, c)
 		f.instrumenter.Instrument(base)
 
 		return github.NewGitHubClientForPAT(c, base), nil

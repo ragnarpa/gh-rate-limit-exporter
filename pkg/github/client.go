@@ -109,8 +109,6 @@ func NewHTTPClientForApp(app App) (*http.Client, error) {
 	return &http.Client{Transport: itr}, nil
 }
 
-type HTTPClientForPAT http.Client
-
 func NewHTTPClientForPAT(ctx context.Context, pat PAT) *http.Client {
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: pat.Token()})
 	return oauth2.NewClient(ctx, ts)
