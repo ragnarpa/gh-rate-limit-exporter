@@ -25,3 +25,17 @@ func NewLogger() (Logger, error) {
 func Module() fx.Option {
 	return fx.Provide(NewLogger)
 }
+
+type NopLogger struct{}
+
+func (*NopLogger) Infof(format string, args ...any) {}
+
+func (*NopLogger) Warnf(format string, args ...any) {}
+
+func (*NopLogger) Info(args ...any) {}
+
+func (*NopLogger) Warn(args ...any) {}
+
+func (*NopLogger) Error(args ...any) {}
+
+var _ Logger = (*NopLogger)(nil)

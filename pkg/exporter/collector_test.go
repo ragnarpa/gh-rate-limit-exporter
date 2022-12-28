@@ -13,7 +13,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	io_prometheus_client "github.com/prometheus/client_model/go"
-	logger_mocks "github.com/ragnarpa/gh-rate-limit-exporter/logger/mocks"
+	"github.com/ragnarpa/gh-rate-limit-exporter/logger"
 	"github.com/ragnarpa/gh-rate-limit-exporter/pkg/github"
 	"github.com/stretchr/testify/assert"
 )
@@ -154,7 +154,7 @@ func newTestCollectorParams() CollectorParams {
 		Credentials:  credentials,
 		Instrumenter: instrumenter,
 		Factory:      &rateLimitsServiceFactoryMock{instrumenter: instrumenter, service: service},
-		Log:          &logger_mocks.NopLogger{},
+		Log:          &logger.NopLogger{},
 	}
 }
 
