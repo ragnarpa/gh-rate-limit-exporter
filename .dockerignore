@@ -1,0 +1,5 @@
+.gitignore
+credentials.json
+Dockerfile
+README.md
+*.pem
