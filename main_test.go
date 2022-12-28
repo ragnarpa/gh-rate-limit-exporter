@@ -11,6 +11,7 @@ import (
 	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/ragnarpa/gh-rate-limit-exporter/logger"
+	logger_mocks "github.com/ragnarpa/gh-rate-limit-exporter/logger/mocks"
 	"github.com/ragnarpa/gh-rate-limit-exporter/pkg/exporter"
 	"github.com/ragnarpa/gh-rate-limit-exporter/pkg/github"
 	"github.com/ragnarpa/gh-rate-limit-exporter/server"
@@ -18,14 +19,6 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 )
-
-type nopLogger struct{}
-
-func (*nopLogger) Infof(format string, args ...any) {}
-func (*nopLogger) Warnf(format string, args ...any) {}
-func (*nopLogger) Info(args ...any)                 {}
-func (*nopLogger) Warn(args ...any)                 {}
-func (*nopLogger) Error(args ...any)                {}
 
 type credentialSourceMock struct{}
 
@@ -166,7 +159,7 @@ func SUT(ctx context.Context, t *testing.T) *fx.App {
 	app := fx.New(
 		module(),
 		fx.Replace(&i),
-		fx.Replace(fx.Annotate(&nopLogger{}, fx.As(new(logger.Logger)))),
+		fx.Replace(fx.Annotate(&logger_mocks.NopLogger{}, fx.As(new(logger.Logger)))),
 		fx.Replace(fx.Annotate(&credentialSourceMock{}, fx.As(new(exporter.CredentialSource)))),
 		fx.Decorate(func() exporter.HttpClientWithAppFactory { return newHttpClientWithAppFactory }),
 		fx.Decorate(func() exporter.HttpClientWithPATFactory { return newHttpClientWithPATFactory }),

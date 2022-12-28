@@ -154,7 +154,7 @@ func newTestCollectorParams() CollectorParams {
 		Credentials:  credentials,
 		Instrumenter: instrumenter,
 		Factory:      &rateLimitsServiceFactoryMock{instrumenter: instrumenter, service: service},
-		Log:          &logger_mocks.Logger{},
+		Log:          &logger_mocks.NopLogger{},
 	}
 }
 
