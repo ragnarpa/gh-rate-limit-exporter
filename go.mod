@@ -40,3 +40,5 @@ require (
 	golang.org/x/crypto v0.0.0-20211108221036-ceb1ce70b4fa // indirect
 	golang.org/x/oauth2 v0.3.0
 )
+
+replace github.com/dgrijalva/jwt-go => github.com/golang-jwt/jwt/v4 v4.4.3
