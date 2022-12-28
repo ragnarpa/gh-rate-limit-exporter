@@ -42,6 +42,7 @@ package main
 
 import (
 	"github.com/ragnarpa/gh-rate-limit-exporter/logger"
+	"github.com/ragnarpa/gh-rate-limit-exporter/metrics"
 	"github.com/ragnarpa/gh-rate-limit-exporter/pkg/exporter"
 	"github.com/ragnarpa/gh-rate-limit-exporter/server"
 	"go.uber.org/fx"
@@ -70,6 +71,7 @@ func main() {
 			),
 		),
 		logger.Module(),
+		metrics.Module(),
 		exporter.Module(),
 		server.Module(),
 		fx.NopLogger,
