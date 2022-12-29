@@ -17,7 +17,6 @@ func Module() fx.Option {
 	return fx.Options(
 		fx.Supply(&i, &fs),
 		fx.Provide(
-			fx.Annotate(NewFileCredentialSource, fx.As(new(CredentialSource))),
 			func(s CredentialSource) []*Credential { return s.Credentials() },
 			func(i metrics.HTTPClientInstrumenter) Instrumenter { return i },
 			func() HttpClientWithAppFactory { return github.NewHTTPClientForApp },
@@ -25,6 +24,7 @@ func Module() fx.Option {
 			NewCollector,
 			NewMetricsHandler,
 			NewRateLimitsServiceFactory,
+			fx.Annotate(NewFileCredentialSource, fx.As(new(CredentialSource))),
 		),
 		fx.Invoke(
 			func(collector *Collector, lc fx.Lifecycle) {

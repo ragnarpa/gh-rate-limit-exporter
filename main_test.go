@@ -64,7 +64,7 @@ func sut(ctx context.Context, t *testing.T) *fx.App {
 		fatal(t, err)
 	}
 
-	fs := &afero.Afero{Fs: afero.NewMemMapFs()}
+	fs := afero.Afero{Fs: afero.NewMemMapFs()}
 	fs.MkdirAll(cwd, 0700)
 	fs.WriteFile(filepath.Join(cwd, exporter.FileCredentialFileName), []byte(credentials), 0600)
 
@@ -72,8 +72,7 @@ func sut(ctx context.Context, t *testing.T) *fx.App {
 
 	app := fx.New(
 		module(),
-		fx.Replace(&i),
-		fx.Replace(fx.Annotate(fs, fx.As(new(afero.Fs)))),
+		fx.Replace(&i, &fs),
 		fx.Replace(fx.Annotate(&logger.NopLogger{}, fx.As(new(logger.Logger)))),
 		fx.Decorate(func() exporter.HttpClientWithAppFactory { return newHttpClientWithApp }),
 		fx.Decorate(func() exporter.HttpClientWithPATFactory { return newHttpClientWithPAT }),
@@ -96,14 +95,14 @@ func TestModule(t *testing.T) {
 			fatal(t, err)
 		}
 
-		fs := &afero.Afero{Fs: afero.NewMemMapFs()}
+		fs := afero.Afero{Fs: afero.NewMemMapFs()}
 		fs.MkdirAll(cwd, 0700)
 		fs.WriteFile(filepath.Join(cwd, exporter.FileCredentialFileName), []byte(""), 0600)
 
 		app := fxtest.New(
 			t,
 			module(),
-			fx.Replace(fx.Annotate(fs, fx.As(new(afero.Fs)))),
+			fx.Replace(&fs),
 			fx.Replace(fx.Annotate(&logger.NopLogger{}, fx.As(new(logger.Logger)))),
 		)
 
