@@ -2,7 +2,7 @@ BIN := gh-rate-limit-exporter
 COVERFILE := cover.out
 
 .PHONY: all
-all: build test
+all: clean build test
 
 .PHONY: build
 build:

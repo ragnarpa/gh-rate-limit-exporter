@@ -42,12 +42,12 @@ type RateLimit struct {
 	AppInstallationID string
 }
 
-func NewRateLimit(m *metadata, resource string, rate *github.Rate) *RateLimit {
+func NewRateLimit(resource string, m *metadata, r *github.Rate) *RateLimit {
 	return &RateLimit{
 		Resource:          resource,
-		Limit:             rate.Limit,
-		Remaining:         rate.Remaining,
-		Reset:             rate.Reset.Time,
+		Limit:             r.Limit,
+		Remaining:         r.Remaining,
+		Reset:             r.Reset.Time,
 		AppName:           m.name,
 		AppKind:           m.kind,
 		AppID:             m.id,
@@ -71,8 +71,8 @@ type gitHubClient struct {
 	client   *github.Client
 }
 
-func NewGitHubClientForApp(app App, base *http.Client) *gitHubClient {
-	client := github.NewClient(base)
+func NewGitHubClientForApp(app App, c *http.Client) *gitHubClient {
+	client := github.NewClient(c)
 	metadata := &metadata{
 		name:           app.Name(),
 		id:             fmt.Sprint(app.ID()),
@@ -83,8 +83,8 @@ func NewGitHubClientForApp(app App, base *http.Client) *gitHubClient {
 	return &gitHubClient{metadata: metadata, client: client}
 }
 
-func NewGitHubClientForPAT(pat PAT, base *http.Client) *gitHubClient {
-	client := github.NewClient(base)
+func NewGitHubClientForPAT(pat PAT, c *http.Client) *gitHubClient {
+	client := github.NewClient(c)
 	metadata := &metadata{name: pat.Name(), kind: pat.Kind()}
 
 	return &gitHubClient{metadata: metadata, client: client}
@@ -115,8 +115,8 @@ func NewHTTPClientForPAT(ctx context.Context, pat PAT) *http.Client {
 }
 
 type resourceRateLimit struct {
-	name string
-	rate *github.Rate
+	resource string
+	rate     *github.Rate
 }
 
 func (c *gitHubClient) RateLimits(ctx context.Context) ([]*RateLimit, error) {
@@ -125,21 +125,21 @@ func (c *gitHubClient) RateLimits(ctx context.Context) ([]*RateLimit, error) {
 		return nil, err
 	}
 
-	var enrichedLimits []*RateLimit
+	var rateLimits []*RateLimit
 	for _, r := range []*resourceRateLimit{
-		{name: "core", rate: limits.Core},
-		{name: "search", rate: limits.Search},
-		{name: "graphql", rate: limits.GraphQL},
-		{name: "scim", rate: limits.SCIM},
-		{name: "source_import", rate: limits.SourceImport},
-		{name: "code_scanning_upload", rate: limits.CodeScanningUpload},
-		{name: "integration_manifest", rate: limits.IntegrationManifest},
-		{name: "actions_runner_registration", rate: limits.ActionsRunnerRegistration},
+		{resource: "core", rate: limits.Core},
+		{resource: "search", rate: limits.Search},
+		{resource: "graphql", rate: limits.GraphQL},
+		{resource: "scim", rate: limits.SCIM},
+		{resource: "source_import", rate: limits.SourceImport},
+		{resource: "code_scanning_upload", rate: limits.CodeScanningUpload},
+		{resource: "integration_manifest", rate: limits.IntegrationManifest},
+		{resource: "actions_runner_registration", rate: limits.ActionsRunnerRegistration},
 	} {
 		if r.rate != nil {
-			enrichedLimits = append(enrichedLimits, NewRateLimit(c.metadata, r.name, r.rate))
+			rateLimits = append(rateLimits, NewRateLimit(r.resource, c.metadata, r.rate))
 		}
 	}
 
-	return enrichedLimits, nil
+	return rateLimits, nil
 }

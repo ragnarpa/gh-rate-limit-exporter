@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"io"
 	"net/http"
 	"os"
@@ -10,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	io_prometheus_client "github.com/prometheus/client_model/go"
+	prommodel "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/ragnarpa/gh-rate-limit-exporter/logger"
 	"github.com/ragnarpa/gh-rate-limit-exporter/pkg/exporter"
@@ -22,48 +23,8 @@ import (
 	"go.uber.org/fx/fxtest"
 )
 
-var rateLimitResponseMock = `
-{
-	"resources": {
-	  "core": {
-		"limit": 5000,
-		"remaining": 4999,
-		"reset": 1372700873,
-		"used": 1
-	  },
-	  "search": {
-		"limit": 30,
-		"remaining": 18,
-		"reset": 1372697452,
-		"used": 12
-	  },
-	  "graphql": {
-		"limit": 5000,
-		"remaining": 4993,
-		"reset": 1372700389,
-		"used": 7
-	  },
-	  "integration_manifest": {
-		"limit": 5000,
-		"remaining": 4999,
-		"reset": 1551806725,
-		"used": 1
-	  },
-	  "code_scanning_upload": {
-		"limit": 500,
-		"remaining": 499,
-		"reset": 1551806725,
-		"used": 1
-	  }
-	},
-	"rate": {
-	  "limit": 5000,
-	  "remaining": 4999,
-	  "reset": 1372700873,
-	  "used": 1
-	}
-}
-`
+//go:embed testdata/rate-limit-response.json
+var rateLimitResponse string
 
 type roundTripperMock struct{}
 
@@ -75,9 +36,9 @@ func (*roundTripperMock) RoundTrip(req *http.Request) (*http.Response, error) {
 		ProtoMinor:    1,
 		Status:        http.StatusText(sc),
 		StatusCode:    sc,
-		Body:          io.NopCloser(strings.NewReader(rateLimitResponseMock)),
+		Body:          io.NopCloser(strings.NewReader(rateLimitResponse)),
 		Request:       req,
-		ContentLength: int64(len(rateLimitResponseMock)),
+		ContentLength: int64(len(rateLimitResponse)),
 		Header:        make(http.Header, 0),
 	}
 
@@ -86,74 +47,18 @@ func (*roundTripperMock) RoundTrip(req *http.Request) (*http.Response, error) {
 
 var httpClientMock *http.Client = &http.Client{Transport: &roundTripperMock{}}
 
-func newHttpClientWithAppFactory(github.App) (*http.Client, error) {
+func newHttpClientWithApp(github.App) (*http.Client, error) {
 	return httpClientMock, nil
 }
 
-func newHttpClientWithPATFactory(context.Context, github.PAT) *http.Client {
+func newHttpClientWithPAT(context.Context, github.PAT) *http.Client {
 	return httpClientMock
 }
 
-func fatal(t *testing.T, err error) {
-	t.Fatalf("unexpected error: %v", err)
-}
+//go:embed testdata/test-credentials.yml
+var credentials string
 
-func findMetricFamily(t *testing.T, name string) *io_prometheus_client.MetricFamily {
-	for _, m := range getMetricFamilies(t) {
-		if m.GetName() == name {
-			return m
-		}
-	}
-
-	return nil
-}
-
-func findMetricByResource(resourceValue string, m []*io_prometheus_client.Metric) *io_prometheus_client.Metric {
-	for _, m := range m {
-		for _, got := range m.GetLabel() {
-			if got.GetName() == "resource" && got.GetValue() == resourceValue {
-				return m
-			}
-		}
-	}
-
-	return nil
-}
-
-func getMetricFamilies(t *testing.T) []*io_prometheus_client.MetricFamily {
-	resp, err := http.Get("http://localhost:" + server.Port + "/metrics")
-	if err != nil {
-		fatal(t, err)
-	}
-
-	tp := &expfmt.TextParser{}
-	metrics, err := tp.TextToMetricFamilies(resp.Body)
-	if err != nil {
-		fatal(t, err)
-	}
-
-	res := make([]*io_prometheus_client.MetricFamily, len(metrics))
-	for _, m := range metrics {
-		res = append(res, m)
-	}
-
-	return res
-}
-
-func usage(remaining, limit float64) float64 {
-	return (limit - remaining) / limit
-}
-
-func SUT(ctx context.Context, t *testing.T) *fx.App {
-	credentials := `
-	{
-		"test-pat": {
-			"type": "gh-pat",
-			"token": ""
-		}
-	}
-	`
-
+func sut(ctx context.Context, t *testing.T) *fx.App {
 	cwd, err := os.Getwd()
 	if err != nil {
 		fatal(t, err)
@@ -161,7 +66,7 @@ func SUT(ctx context.Context, t *testing.T) *fx.App {
 
 	fs := &afero.Afero{Fs: afero.NewMemMapFs()}
 	fs.MkdirAll(cwd, 0700)
-	fs.WriteFile(filepath.Join(cwd, "credentials.json"), []byte(credentials), 0600)
+	fs.WriteFile(filepath.Join(cwd, exporter.FileCredentialFileName), []byte(credentials), 0600)
 
 	i := exporter.Interval(100 * time.Millisecond)
 
@@ -170,8 +75,8 @@ func SUT(ctx context.Context, t *testing.T) *fx.App {
 		fx.Replace(&i),
 		fx.Replace(fx.Annotate(fs, fx.As(new(afero.Fs)))),
 		fx.Replace(fx.Annotate(&logger.NopLogger{}, fx.As(new(logger.Logger)))),
-		fx.Decorate(func() exporter.HttpClientWithAppFactory { return newHttpClientWithAppFactory }),
-		fx.Decorate(func() exporter.HttpClientWithPATFactory { return newHttpClientWithPATFactory }),
+		fx.Decorate(func() exporter.HttpClientWithAppFactory { return newHttpClientWithApp }),
+		fx.Decorate(func() exporter.HttpClientWithPATFactory { return newHttpClientWithPAT }),
 	)
 
 	if err := app.Start(ctx); err != nil {
@@ -193,13 +98,13 @@ func TestModule(t *testing.T) {
 
 		fs := &afero.Afero{Fs: afero.NewMemMapFs()}
 		fs.MkdirAll(cwd, 0700)
-		fs.WriteFile(filepath.Join(cwd, "credentials.json"), []byte("{}"), 0600)
+		fs.WriteFile(filepath.Join(cwd, exporter.FileCredentialFileName), []byte(""), 0600)
 
 		app := fxtest.New(
 			t,
 			module(),
-			fx.Replace(fx.Annotate(&logger.NopLogger{}, fx.As(new(logger.Logger)))),
 			fx.Replace(fx.Annotate(fs, fx.As(new(afero.Fs)))),
+			fx.Replace(fx.Annotate(&logger.NopLogger{}, fx.As(new(logger.Logger)))),
 		)
 
 		app.RequireStart().RequireStop()
@@ -228,7 +133,7 @@ func TestModule(t *testing.T) {
 	} {
 		t.Run("fx app serves expected metrics", func(t *testing.T) {
 			ctx := context.Background()
-			app := SUT(ctx, t)
+			app := sut(ctx, t)
 			defer app.Stop(ctx)
 
 			<-time.After(200 * time.Millisecond)
@@ -239,4 +144,54 @@ func TestModule(t *testing.T) {
 			assert.Equal(t, test.expected, m.Gauge.GetValue())
 		})
 	}
+}
+
+func fatal(t *testing.T, err error) {
+	t.Fatalf("unexpected error: %v", err)
+}
+
+func findMetricFamily(t *testing.T, name string) *prommodel.MetricFamily {
+	for _, m := range getMetricFamilies(t) {
+		if m.GetName() == name {
+			return m
+		}
+	}
+
+	return nil
+}
+
+func findMetricByResource(name string, m []*prommodel.Metric) *prommodel.Metric {
+	for _, m := range m {
+		for _, l := range m.GetLabel() {
+			if l.GetName() == "resource" && l.GetValue() == name {
+				return m
+			}
+		}
+	}
+
+	return nil
+}
+
+func getMetricFamilies(t *testing.T) []*prommodel.MetricFamily {
+	resp, err := http.Get("http://localhost:" + server.Port + "/metrics")
+	if err != nil {
+		fatal(t, err)
+	}
+
+	tp := &expfmt.TextParser{}
+	mfamilies, err := tp.TextToMetricFamilies(resp.Body)
+	if err != nil {
+		fatal(t, err)
+	}
+
+	res := make([]*prommodel.MetricFamily, len(mfamilies))
+	for _, mf := range mfamilies {
+		res = append(res, mf)
+	}
+
+	return res
+}
+
+func usage(remaining, limit float64) float64 {
+	return (limit - remaining) / limit
 }

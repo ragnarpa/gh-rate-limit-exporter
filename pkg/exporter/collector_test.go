@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	io_prometheus_client "github.com/prometheus/client_model/go"
+	prommodel "github.com/prometheus/client_model/go"
 	"github.com/ragnarpa/gh-rate-limit-exporter/logger"
 	"github.com/ragnarpa/gh-rate-limit-exporter/pkg/github"
 	"github.com/stretchr/testify/assert"
@@ -21,25 +21,6 @@ import (
 type instrumenterMock struct{}
 
 func (i *instrumenterMock) Instrument(*http.Client) {}
-
-func GeneratePrivateKey(t *testing.T) string {
-	key, err := rsa.GenerateKey(rand.Reader, 128)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	data, err := x509.MarshalPKCS8PrivateKey(key)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	block := &pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: data,
-	}
-
-	return base64.StdEncoding.EncodeToString(pem.EncodeToMemory(block))
-}
 
 type rateLimitsServiceMock struct {
 	resource          string
@@ -52,7 +33,7 @@ type rateLimitsServiceMock struct {
 }
 
 func (rls *rateLimitsServiceMock) RateLimits(context.Context) ([]*github.RateLimit, error) {
-	return []*github.RateLimit{
+	limits := []*github.RateLimit{
 		{
 			Resource:          rls.resource,
 			Limit:             rls.limit,
@@ -62,7 +43,9 @@ func (rls *rateLimitsServiceMock) RateLimits(context.Context) ([]*github.RateLim
 			AppID:             rls.appID,
 			AppInstallationID: rls.appInstallationID,
 		},
-	}, nil
+	}
+
+	return limits, nil
 }
 
 type rateLimitsServiceFactoryMock struct {
@@ -96,7 +79,7 @@ func TestRateLimitsServiceFactory(t *testing.T) {
 				AppCredential: &AppCredential{
 					ID:             1,
 					InstallationID: 2,
-					Key:            GeneratePrivateKey(t),
+					Key:            generatePrivateKey(t),
 				},
 			},
 		)
@@ -135,6 +118,20 @@ func TestRateLimitsServiceFactory(t *testing.T) {
 	})
 }
 
+func TestNewCollector(t *testing.T) {
+	t.Run("returns new prepared rate limit metrics collector", func(t *testing.T) {
+		cp := newTestCollectorParams()
+		c := NewCollector(cp)
+
+		assert.Equal(t, cp.Credentials, c.credentials)
+		assert.Equal(t, cp.Factory, c.factory)
+		assert.Equal(t, cp.Log, c.log)
+		assert.NotNil(t, c.rateLimit)
+		assert.NotNil(t, c.rateLimitRemaining)
+		assert.NotNil(t, c.rateLimitUsage)
+	})
+}
+
 func newTestCollectorParams() CollectorParams {
 	instrumenter := &instrumenterMock{}
 	service := &rateLimitsServiceMock{
@@ -158,32 +155,8 @@ func newTestCollectorParams() CollectorParams {
 	}
 }
 
-func TestNewCollector(t *testing.T) {
-	t.Run("returns new prepared rate limit metrics collector", func(t *testing.T) {
-		cp := newTestCollectorParams()
-		c := NewCollector(cp)
-
-		assert.Equal(t, cp.Credentials, c.credentials)
-		assert.Equal(t, cp.Factory, c.factory)
-		assert.Equal(t, cp.Log, c.log)
-		assert.NotNil(t, c.rateLimit)
-		assert.NotNil(t, c.rateLimitRemaining)
-		assert.NotNil(t, c.rateLimitUsage)
-	})
-}
-
-func findMetricFamily(name string, metrics []*io_prometheus_client.MetricFamily) *io_prometheus_client.MetricFamily {
-	for _, m := range metrics {
-		if m.GetName() == name {
-			return m
-		}
-	}
-
-	return nil
-}
-
 func TestCollectorStart(t *testing.T) {
-	assertContainsRateLimitMetrics := func(t *testing.T, metrics []*io_prometheus_client.MetricFamily) {
+	assertContainsRateLimitMetrics := func(t *testing.T, metrics []*prommodel.MetricFamily) {
 		assert.NotNil(t, findMetricFamily("gh_rate_limit_exporter_rate_limit_remaining", metrics))
 		assert.NotNil(t, findMetricFamily("gh_rate_limit_exporter_rate_limit_usage", metrics))
 		assert.NotNil(t, findMetricFamily("gh_rate_limit_exporter_rate_limit_total", metrics))
@@ -202,11 +175,25 @@ func TestCollectorStart(t *testing.T) {
 
 		metrics, err := reg.Gather()
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			fatal(t, err)
 		}
 
 		assertContainsRateLimitMetrics(t, metrics)
 	})
+}
+
+func fatal(t *testing.T, err error) {
+	t.Fatalf("unexpected error: %v", err)
+}
+
+func findMetricFamily(name string, metrics []*prommodel.MetricFamily) *prommodel.MetricFamily {
+	for _, m := range metrics {
+		if m.GetName() == name {
+			return m
+		}
+	}
+
+	return nil
 }
 
 func TestCollectorSetRateXxx(t *testing.T) {
@@ -222,7 +209,7 @@ func TestCollectorSetRateXxx(t *testing.T) {
 		AppInstallationID: "test-app-installation-id",
 	}
 
-	findLabel := func(name string, labels []*io_prometheus_client.LabelPair) *io_prometheus_client.LabelPair {
+	findLabel := func(name string, labels []*prommodel.LabelPair) *prommodel.LabelPair {
 		for _, l := range labels {
 			if l.GetName() == name {
 				return l
@@ -232,7 +219,7 @@ func TestCollectorSetRateXxx(t *testing.T) {
 		return nil
 	}
 
-	assertCorrectValueAndLabels := func(t *testing.T, expected float64, m *io_prometheus_client.Metric) {
+	assertCorrectValueAndLabels := func(t *testing.T, expected float64, m *prommodel.Metric) {
 		val := m.Gauge.GetValue()
 		labels := m.GetLabel()
 
@@ -253,7 +240,7 @@ func TestCollectorSetRateXxx(t *testing.T) {
 
 		metrics, err := reg.Gather()
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			fatal(t, err)
 		}
 
 		mf := findMetricFamily("gh_rate_limit_exporter_rate_limit_total", metrics)
@@ -272,7 +259,7 @@ func TestCollectorSetRateXxx(t *testing.T) {
 
 		metrics, err := reg.Gather()
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			fatal(t, err)
 		}
 
 		mf := findMetricFamily("gh_rate_limit_exporter_rate_limit_remaining", metrics)
@@ -291,7 +278,7 @@ func TestCollectorSetRateXxx(t *testing.T) {
 
 		metrics, err := reg.Gather()
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			fatal(t, err)
 		}
 
 		mf := findMetricFamily("gh_rate_limit_exporter_rate_limit_usage", metrics)
@@ -300,4 +287,23 @@ func TestCollectorSetRateXxx(t *testing.T) {
 		assert.Len(t, mf.GetMetric(), 1)
 		assertCorrectValueAndLabels(t, float64(0.5), m)
 	})
+}
+
+func generatePrivateKey(t *testing.T) string {
+	key, err := rsa.GenerateKey(rand.Reader, 128)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	block := &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: data,
+	}
+
+	return base64.StdEncoding.EncodeToString(pem.EncodeToMemory(block))
 }

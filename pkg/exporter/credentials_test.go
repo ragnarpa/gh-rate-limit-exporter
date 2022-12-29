@@ -1,7 +1,7 @@
 package exporter
 
 import (
-	"encoding/json"
+	_ "embed"
 	"os"
 	"path/filepath"
 	"testing"
@@ -19,8 +19,8 @@ func Cwd(t *testing.T) string {
 	return cwd
 }
 
-func NewTestFS(t *testing.T) afero.Fs {
-	fs := afero.NewMemMapFs()
+func NewTestFS(t *testing.T) *afero.Afero {
+	fs := &afero.Afero{Fs: afero.NewMemMapFs()}
 	err := fs.MkdirAll(Cwd(t), 0700)
 	if err != nil {
 		t.FailNow()
@@ -29,26 +29,11 @@ func NewTestFS(t *testing.T) afero.Fs {
 	return fs
 }
 
-func writeCredentialsInValidFormat(t *testing.T, fs afero.Fs) {
-	data := `
-		{
-			"my-app-one": {
-				"type": "gh-app",
-				"appId": 1,
-				"installationId": 2,
-				"key": "key"
-			},
-			"my-app-two": {
-				"type": "gh-pat",
-				"token": "token"
-			}
-		}`
+//go:embed testdata/test-credentials.yml
+var credentials string
 
-	afero.WriteFile(fs, filepath.Join(Cwd(t), FileCredentialFileName), []byte(data), 0600)
-}
-
-func writeCredentialsInMalformedFormat(t *testing.T, fs afero.Fs) {
-	afero.WriteFile(fs, filepath.Join(Cwd(t), FileCredentialFileName), []byte("[]"), 0600)
+func writeCredentials(b []byte, t *testing.T, fs *afero.Afero) {
+	fs.WriteFile(filepath.Join(Cwd(t), FileCredentialFileName), b, 0600)
 }
 
 func TestFileCredentialSource(t *testing.T) {
@@ -56,7 +41,7 @@ func TestFileCredentialSource(t *testing.T) {
 
 	t.Run("reads credentials from credential file", func(t *testing.T) {
 		fs := NewTestFS(t)
-		writeCredentialsInValidFormat(t, fs)
+		writeCredentials([]byte(credentials), t, fs)
 
 		var src CredentialSource
 		src, err := NewFileCredentialSource(fs)
@@ -68,15 +53,12 @@ func TestFileCredentialSource(t *testing.T) {
 
 	t.Run("returns error with malformed credential file", func(t *testing.T) {
 		fs := NewTestFS(t)
-		writeCredentialsInMalformedFormat(t, fs)
+		writeCredentials([]byte("..."), t, fs)
 
 		src, err := NewFileCredentialSource(fs)
 
 		assert.Nil(t, src)
-		if assert.Error(t, err) {
-			target := &json.UnmarshalTypeError{}
-			assert.ErrorAs(t, err, &target)
-		}
+		assert.EqualError(t, err, "yaml: did not find expected node content")
 	})
 
 	t.Run("returns error if credential file does not exist", func(t *testing.T) {
@@ -124,7 +106,7 @@ func TestCredential(t *testing.T) {
 
 	t.Run("credentials are decoded correctly", func(t *testing.T) {
 		fs := NewTestFS(t)
-		writeCredentialsInValidFormat(t, fs)
+		writeCredentials([]byte(credentials), t, fs)
 
 		var src CredentialSource
 		src, err := NewFileCredentialSource(fs)

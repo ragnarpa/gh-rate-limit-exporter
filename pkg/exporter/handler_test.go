@@ -24,9 +24,7 @@ func TestNewMetricsHandler(t *testing.T) {
 			assert.True(t, r.Unregister(c))
 		}
 
-		if len(c.Collectors()) < 1 {
-			assert.Fail(t, "no collectors")
-		}
+		assert.Greater(t, len(c.Collectors()), 0, "no collectors")
 	})
 }
 

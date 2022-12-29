@@ -11,13 +11,15 @@ import (
 )
 
 func Module() fx.Option {
+	i := Interval(30 * time.Second)
+	fs := afero.Afero{Fs: afero.NewOsFs()}
+
 	return fx.Options(
+		fx.Supply(&i, &fs),
 		fx.Provide(
 			fx.Annotate(NewFileCredentialSource, fx.As(new(CredentialSource))),
-			func() afero.Fs { return afero.NewOsFs() },
 			func(s CredentialSource) []*Credential { return s.Credentials() },
 			func(i metrics.HTTPClientInstrumenter) Instrumenter { return i },
-			func() *Interval { i := Interval(30 * time.Second); return &i },
 			func() HttpClientWithAppFactory { return github.NewHTTPClientForApp },
 			func() HttpClientWithPATFactory { return github.NewHTTPClientForPAT },
 			NewCollector,
