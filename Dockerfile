@@ -7,5 +7,6 @@ COPY . /app
 RUN CGO_ENABLED=0 go build -o gh-rate-limit-exporter main.go
 
 FROM gcr.io/distroless/static:nonroot
+WORKDIR /
 COPY --from=build /app/gh-rate-limit-exporter /
 CMD [ "/gh-rate-limit-exporter" ]
