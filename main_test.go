@@ -4,6 +4,8 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -14,22 +16,11 @@ import (
 	"github.com/ragnarpa/gh-rate-limit-exporter/pkg/exporter"
 	"github.com/ragnarpa/gh-rate-limit-exporter/pkg/github"
 	"github.com/ragnarpa/gh-rate-limit-exporter/server"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 )
-
-type credentialSourceMock struct{}
-
-func (s *credentialSourceMock) Credentials() []*exporter.Credential {
-	return []*exporter.Credential{
-		{
-			Type:    exporter.GitHubPAT,
-			AppName: "app-name",
-			PAT:     &exporter.PAT{},
-		},
-	}
-}
 
 var rateLimitResponseMock = `
 {
@@ -154,12 +145,31 @@ func usage(remaining, limit float64) float64 {
 }
 
 func SUT(ctx context.Context, t *testing.T) *fx.App {
+	credentials := `
+	{
+		"test-pat": {
+			"type": "gh-pat",
+			"token": ""
+		}
+	}
+	`
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		fatal(t, err)
+	}
+
+	fs := &afero.Afero{Fs: afero.NewMemMapFs()}
+	fs.MkdirAll(cwd, 0700)
+	fs.WriteFile(filepath.Join(cwd, "credentials.json"), []byte(credentials), 0600)
+
 	i := exporter.Interval(100 * time.Millisecond)
+
 	app := fx.New(
 		module(),
 		fx.Replace(&i),
+		fx.Replace(fx.Annotate(fs, fx.As(new(afero.Fs)))),
 		fx.Replace(fx.Annotate(&logger.NopLogger{}, fx.As(new(logger.Logger)))),
-		fx.Replace(fx.Annotate(&credentialSourceMock{}, fx.As(new(exporter.CredentialSource)))),
 		fx.Decorate(func() exporter.HttpClientWithAppFactory { return newHttpClientWithAppFactory }),
 		fx.Decorate(func() exporter.HttpClientWithPATFactory { return newHttpClientWithPATFactory }),
 	)
@@ -176,7 +186,22 @@ func TestModule(t *testing.T) {
 	t.Parallel()
 
 	t.Run("fx app starts and stops cleanly", func(t *testing.T) {
-		app := fxtest.New(t, module())
+		cwd, err := os.Getwd()
+		if err != nil {
+			fatal(t, err)
+		}
+
+		fs := &afero.Afero{Fs: afero.NewMemMapFs()}
+		fs.MkdirAll(cwd, 0700)
+		fs.WriteFile(filepath.Join(cwd, "credentials.json"), []byte("{}"), 0600)
+
+		app := fxtest.New(
+			t,
+			module(),
+			fx.Replace(fx.Annotate(&logger.NopLogger{}, fx.As(new(logger.Logger)))),
+			fx.Replace(fx.Annotate(fs, fx.As(new(afero.Fs)))),
+		)
+
 		app.RequireStart().RequireStop()
 	})
 
