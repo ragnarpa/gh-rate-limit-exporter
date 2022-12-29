@@ -14,13 +14,13 @@ By default, the exporter expects to find credentials (GitHub App or PAT) in cred
 
 ```yaml
 my-github-app-name:
-	type: gh-app
-	appId: <app id (integer) goes here>
-	installationId: <installation id (integer) goes here>
-	key: <base64 encoded private key goes here>
+  type: gh-app
+  appId: <app id (integer) goes here>
+  installationId: <installation id (integer) goes here>
+  key: <base64 encoded private key goes here>
 my-pat-name:
-	type: gh-pat
-	token: <PAT goes here>
+  type: gh-pat
+  token: <PAT goes here>
 ```
 
 You can have as many GitHub credentials in credentials.yml as you want. **gh-rate-limit-exporter** will fetch the rate limit usage for every credential and exposes it on `http://localhost:8080/metrics`.
