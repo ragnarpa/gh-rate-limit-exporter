@@ -89,7 +89,7 @@ You can build the container image with the default implementation (credentials.y
 
 ```shell
 docker build -t gh-rate-limit-exporter .
-docker run --rm -v /path/to/credentials.yml:/credentials.yml -p 8080:8080 gh-rate-limit-exporter 
+docker run --rm -v /path/to/credentials.yml:/home/nonroot/credentials.yml -p 8080:8080 gh-rate-limit-exporter 
 ```
 
 Navigate to `http://localhost:8080/metrics` and after 30 seconds you should see GitHub API rate limit usage exposed as Prometheus metrics.
