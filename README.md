@@ -1,5 +1,8 @@
 # gh-rate-limit-exporter
 
+![Build & Test](https://github.com/ragnarpa/gh-rate-limit-exporter/actions/workflows/build-and-test.yml/badge.svg?branch=main&event=push)
+![Build Image](https://github.com/ragnarpa/gh-rate-limit-exporter/actions/workflows/build-container-image.yml/badge.svg)
+
 The exporter you longed for to expose GitHub API rate limits as Prometheus metrics.
 
 Why bother? Building your pipelines with GitHub Actions will most likely require you to integrate with GitHub API. The more your business and pipelines grow the more you send requests toward GitHub API. Using GitHub API comes free only until a certain limit and beyond that limit, you will be throttled. This tool aims to give you the visibility on how far you are from the limits with your GitHub Apps and GitHub PATs (autheticated users). Throttling is applied at the authenticated user level.
