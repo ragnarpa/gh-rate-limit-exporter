@@ -11,10 +11,10 @@ type MetricsHandler struct {
 	registry *prometheus.Registry
 }
 
-func NewMetricsHandler(c *Collector, registry *prometheus.Registry) *MetricsHandler {
-	registry.MustRegister(c.Collectors()...)
+func NewMetricsHandler(c *Collector, r *prometheus.Registry) *MetricsHandler {
+	r.MustRegister(c.Collectors()...)
 
-	return &MetricsHandler{registry}
+	return &MetricsHandler{r}
 }
 
 func (h *MetricsHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {

@@ -8,6 +8,7 @@ import (
 type Logger interface {
 	Infof(format string, args ...any)
 	Warnf(format string, args ...any)
+	Errorf(format string, args ...any)
 	Info(args ...any)
 	Warn(args ...any)
 	Error(args ...any)
@@ -31,6 +32,8 @@ type NopLogger struct{}
 func (*NopLogger) Infof(format string, args ...any) {}
 
 func (*NopLogger) Warnf(format string, args ...any) {}
+
+func (*NopLogger) Errorf(format string, args ...any) {}
 
 func (*NopLogger) Info(args ...any) {}
 

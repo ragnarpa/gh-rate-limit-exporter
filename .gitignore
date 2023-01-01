@@ -1,4 +1,6 @@
 *.pem
-config.json
-credentials.json
 cover.out
+credentials.json
+credentials.yaml
+credentials.yml
+gh-rate-limit-exporter

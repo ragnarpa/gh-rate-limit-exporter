@@ -1,28 +1,16 @@
 package exporter
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 
 	"github.com/spf13/afero"
+	"gopkg.in/yaml.v3"
 )
 
 type CredentialSource interface {
 	Credentials() []*Credential
 }
-
-type (
-	AppCredential struct {
-		ID             int64  `json:"appId"`
-		InstallationID int64  `json:"installationId"`
-		Key            string `json:"key"`
-	}
-
-	PAT struct {
-		Token string `json:"token"`
-	}
-)
 
 type Type string
 
@@ -31,12 +19,24 @@ const (
 	GitHubPAT Type = "gh-pat"
 )
 
-type Credential struct {
-	Type    Type `json:"type"`
-	AppName string
-	*AppCredential
-	*PAT
-}
+type (
+	AppCredential struct {
+		ID             int64  `yaml:"appId"`
+		InstallationID int64  `yaml:"installationId"`
+		Key            string `yaml:"key"`
+	}
+
+	PAT struct {
+		Token string `yaml:"token"`
+	}
+
+	Credential struct {
+		Type           Type `yaml:"type"`
+		AppName        string
+		*AppCredential `yaml:",inline"`
+		*PAT           `yaml:",inline"`
+	}
+)
 
 func (c *Credential) Name() string {
 	return c.AppName
@@ -62,52 +62,51 @@ func (c *Credential) Kind() string {
 	return string(c.Type)
 }
 
-const FileCredentialFileName = "credentials.json"
+const FileCredentialFileName = "credentials.yml"
 
 type FileCredentialSource struct {
 	Data map[string]*Credential
 }
 
-func NewFileCredentialSource(fs afero.Fs) (*FileCredentialSource, error) {
+func NewFileCredentialSource(fs *afero.Afero) (*FileCredentialSource, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
 	}
 
-	b, err := afero.ReadFile(fs, filepath.Join(cwd, FileCredentialFileName))
+	b, err := fs.ReadFile(filepath.Join(cwd, FileCredentialFileName))
 	if err != nil {
 		return nil, err
 	}
 
-	var conf FileCredentialSource
-	err = json.Unmarshal(b, &conf)
+	var src FileCredentialSource
+	err = yaml.Unmarshal(b, &src)
 	if err != nil {
 		return nil, err
 	}
 
-	return &conf, nil
+	return &src, nil
 }
 
-func (c *FileCredentialSource) UnmarshalJSON(data []byte) error {
-	var m = make(map[string]*Credential)
-
-	if err := json.Unmarshal(data, &m); err != nil {
+func (src *FileCredentialSource) UnmarshalYAML(root *yaml.Node) error {
+	credentials := make(map[string]*Credential)
+	if err := root.Decode(credentials); err != nil {
 		return err
 	}
 
-	c.Data = make(map[string]*Credential)
+	src.Data = make(map[string]*Credential)
 
-	for name, credential := range m {
-		c.Data[name] = credential
-		c.Data[name].AppName = name
+	for name, credential := range credentials {
+		src.Data[name] = credential
+		src.Data[name].AppName = name
 	}
 
 	return nil
 }
 
-func (c *FileCredentialSource) Credentials() []*Credential {
-	credentials := make([]*Credential, 0, len(c.Data))
-	for _, c := range c.Data {
+func (src *FileCredentialSource) Credentials() []*Credential {
+	credentials := make([]*Credential, 0, len(src.Data))
+	for _, c := range src.Data {
 		credentials = append(credentials, c)
 	}
 

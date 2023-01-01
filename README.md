@@ -10,26 +10,22 @@ To learn more about GitHub API rate limits go [here](https://docs.github.com/en/
 
 ## How to use
 
-By default, the exporter expects to find credentials (GitHub App or PAT) in credentials.json in current working directory.
+By default, the exporter expects to find credentials (GitHub App or PAT) in credentials.yml in current working directory.
 
-```json
-{
-	"my-github-app-name": {
-		"type": "gh-app",
-		"appId": "<app id (integer) goes here>",
-		"installationId": "<installation id (integer) goes here>",
-		"key": "<base64 encoded private key goes here>"
-	},
-	"my-pat-name": {
-		"type": "gh-pat",
-		"token": "<PAT goes here>"
-	}
-}
+```yaml
+my-github-app-name:
+  type: gh-app
+  appId: <app id (integer) goes here>
+  installationId: <installation id (integer) goes here>
+  key: <base64 encoded private key goes here>
+my-pat-name:
+  type: gh-pat
+  token: <PAT goes here>
 ```
 
-You can have as many GitHub credentials in credentials.json as you want. **gh-rate-limit-exporter** will fetch the rate limit usage for every credential and exposes it on `http://localhost:8080/metrics`.
+You can have as many GitHub credentials in credentials.yml as you want. **gh-rate-limit-exporter** will fetch the rate limit usage for every credential and exposes it on `http://localhost:8080/metrics`.
 
-But I do not want to store my GitHub credentials in credentials.json!
+But I do not want to store my GitHub credentials in credentials.yml!
 
 In this case you need to create a new Go module and write a bit of code in Go. For the sake of example let's assume that you want to consume the credentials directly from the process memory. For that do the following.
 
@@ -79,13 +75,7 @@ func main() {
 }
 ```
 
-After running your Go program (`go run main.go`) you should see something like following.
-
-```log
-2022/12/20 20:41:47 Collecting data...
-2022/12/20 20:41:47 GET https://api.github.com/rate_limit: 401 Bad credentials []
-2022/12/20 20:41:47 ...data collected.
-```
+After running your Go program (`go run main.go`) you should see `... 401 Bad credentials ...` error messages in the logs.
 
 The `401` error is expected as the example is using a made-up credential.
 
@@ -95,11 +85,11 @@ If you would like to consume credentials from some sort of credential provider, 
 
 ## Container image
 
-You can build the container image with the default implementation (credentials.json) and then run the exporter within a container.
+You can build the container image with the default implementation (credentials.yml) and then run the exporter within a container.
 
 ```shell
 docker build -t gh-rate-limit-exporter .
-docker run --rm -v /path/to/credentials.json:/credentials.json -p 8080:8080 gh-rate-limit-exporter 
+docker run --rm -v /path/to/credentials.yml:/credentials.yml -p 8080:8080 gh-rate-limit-exporter 
 ```
 
 Navigate to `http://localhost:8080/metrics` and after 30 seconds you should see GitHub API rate limit usage exposed as Prometheus metrics.

@@ -25,12 +25,6 @@ type (
 	RateLimitsServiceFactory interface {
 		Create(context.Context, *Credential) (RateLimitsService, error)
 	}
-
-	rateLimitsServiceFactory struct {
-		instrumenter            Instrumenter
-		createHTTPClientWithPAT func(context.Context, github.PAT) *http.Client
-		createHTTPClientWithApp func(github.App) (*http.Client, error)
-	}
 )
 
 type (
@@ -43,6 +37,12 @@ type (
 		Instrumenter             Instrumenter
 		HttpClientWithPATFactory HttpClientWithPATFactory
 		HttpClientWithAppFactory HttpClientWithAppFactory
+	}
+
+	rateLimitsServiceFactory struct {
+		instrumenter            Instrumenter
+		createHTTPClientWithPAT func(context.Context, github.PAT) *http.Client
+		createHTTPClientWithApp func(github.App) (*http.Client, error)
 	}
 )
 
@@ -86,6 +86,16 @@ const (
 type (
 	Interval int64
 
+	CollectorParams struct {
+		fx.In
+
+		Interval     *Interval
+		Credentials  []*Credential
+		Instrumenter Instrumenter
+		Factory      RateLimitsServiceFactory
+		Log          logger.Logger
+	}
+
 	Collector struct {
 		credentials        []*Credential
 		rateLimit          *prometheus.GaugeVec
@@ -96,19 +106,9 @@ type (
 		log                logger.Logger
 		once               sync.Once
 	}
-
-	CollectorParams struct {
-		fx.In
-
-		Interval     *Interval
-		Credentials  []*Credential
-		Instrumenter Instrumenter
-		Factory      RateLimitsServiceFactory
-		Log          logger.Logger
-	}
 )
 
-func NewCollector(params CollectorParams) *Collector {
+func NewCollector(p CollectorParams) *Collector {
 	const ns = "gh_rate_limit_exporter"
 	labels := []string{LabelName, LabelResource, LabelType, LabelAppID, LabelAppInstallationID}
 
@@ -138,13 +138,13 @@ func NewCollector(params CollectorParams) *Collector {
 	)
 
 	return &Collector{
-		interval:           params.Interval,
-		credentials:        params.Credentials,
+		interval:           p.Interval,
+		credentials:        p.Credentials,
 		rateLimit:          rateLimit,
 		rateLimitRemaining: rateLimitRemaining,
 		rateLimitUsage:     rateLimitUsage,
-		factory:            params.Factory,
-		log:                params.Log,
+		factory:            p.Factory,
+		log:                p.Log,
 	}
 }
 
@@ -209,7 +209,7 @@ func (c *Collector) CollectAll(ctx context.Context) {
 		}
 
 		if err := c.CollectOne(ctx, rls); err != nil {
-			c.log.Error(err)
+			c.log.Errorf("collector: name=%v err=%v", credential.AppName, err)
 		}
 	}
 }

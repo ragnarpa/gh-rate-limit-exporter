@@ -46,9 +46,9 @@ type ServerMuxParams struct {
 }
 
 func NewServeMux(p ServerMuxParams) *http.ServeMux {
-	instrumentedHandler := p.Instrumenter.Instrument("/metrics", p.Handler)
+	h := p.Instrumenter.Instrument("/metrics", p.Handler)
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", instrumentedHandler)
+	mux.Handle("/metrics", h)
 
 	return mux
 }
