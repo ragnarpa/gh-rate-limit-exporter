@@ -201,16 +201,25 @@ func (c *Collector) Start(ctx context.Context) {
 }
 
 func (c *Collector) CollectAll(ctx context.Context) {
+	var wg sync.WaitGroup
+	wg.Add(len(c.credentials))
+	defer wg.Wait()
+
 	for _, credential := range c.credentials {
+		appName := credential.AppName
 		rls, err := c.factory.Create(ctx, credential)
 		if err != nil {
-			c.log.Error(err)
+			c.log.Errorf("collector %v: %v", appName, err)
+			wg.Done()
 			continue
 		}
 
-		if err := c.CollectOne(ctx, rls); err != nil {
-			c.log.Errorf("collector: name=%v err=%v", credential.AppName, err)
-		}
+		go func() {
+			defer wg.Done()
+			if err := c.CollectOne(ctx, rls); err != nil {
+				c.log.Errorf("collector %v: %v", appName, err)
+			}
+		}()
 	}
 }
 
