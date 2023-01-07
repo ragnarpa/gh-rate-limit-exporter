@@ -11,8 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-	prommodel "github.com/prometheus/client_model/go"
 	"github.com/ragnarpa/gh-rate-limit-exporter/logger"
 	"github.com/ragnarpa/gh-rate-limit-exporter/pkg/github"
 	"github.com/stretchr/testify/assert"
@@ -126,9 +124,11 @@ func TestNewCollector(t *testing.T) {
 		assert.Equal(t, cp.Credentials, c.credentials)
 		assert.Equal(t, cp.Factory, c.factory)
 		assert.Equal(t, cp.Log, c.log)
-		assert.NotNil(t, c.rateLimit)
+		assert.NotNil(t, c.rateLimitTotal)
 		assert.NotNil(t, c.rateLimitRemaining)
 		assert.NotNil(t, c.rateLimitUsage)
+		assert.NotNil(t, c.ctx)
+		assert.NotNil(t, c.cancel)
 	})
 }
 
@@ -153,140 +153,6 @@ func newTestCollectorParams() CollectorParams {
 		Factory:      &rateLimitsServiceFactoryMock{instrumenter: instrumenter, service: service},
 		Log:          &logger.NopLogger{},
 	}
-}
-
-func TestCollectorStart(t *testing.T) {
-	assertContainsRateLimitMetrics := func(t *testing.T, metrics []*prommodel.MetricFamily) {
-		assert.NotNil(t, findMetricFamily("gh_rate_limit_exporter_rate_limit_remaining", metrics))
-		assert.NotNil(t, findMetricFamily("gh_rate_limit_exporter_rate_limit_usage", metrics))
-		assert.NotNil(t, findMetricFamily("gh_rate_limit_exporter_rate_limit_total", metrics))
-	}
-
-	t.Run("starts rate limit metrics collection", func(t *testing.T) {
-		cp := newTestCollectorParams()
-		c := NewCollector(cp)
-		reg := prometheus.NewRegistry()
-		reg.MustRegister(c.Collectors()...)
-
-		ctx, cancel := context.WithCancel(context.Background())
-		c.Start(ctx)
-		<-time.After(2 * time.Second)
-		cancel()
-
-		metrics, err := reg.Gather()
-		if err != nil {
-			fatal(t, err)
-		}
-
-		assertContainsRateLimitMetrics(t, metrics)
-	})
-}
-
-func fatal(t *testing.T, err error) {
-	t.Fatalf("unexpected error: %v", err)
-}
-
-func findMetricFamily(name string, metrics []*prommodel.MetricFamily) *prommodel.MetricFamily {
-	for _, m := range metrics {
-		if m.GetName() == name {
-			return m
-		}
-	}
-
-	return nil
-}
-
-func TestCollectorSetRateXxx(t *testing.T) {
-	t.Parallel()
-
-	rl := &github.RateLimit{
-		Resource:          "test-resource",
-		Limit:             1000,
-		Remaining:         500,
-		AppName:           "test-name",
-		AppKind:           string(GitHubApp),
-		AppID:             "test-app-id",
-		AppInstallationID: "test-app-installation-id",
-	}
-
-	findLabel := func(name string, labels []*prommodel.LabelPair) *prommodel.LabelPair {
-		for _, l := range labels {
-			if l.GetName() == name {
-				return l
-			}
-		}
-
-		return nil
-	}
-
-	assertCorrectValueAndLabels := func(t *testing.T, expected float64, m *prommodel.Metric) {
-		val := m.Gauge.GetValue()
-		labels := m.GetLabel()
-
-		assert.Equal(t, expected, val)
-		assert.Equal(t, rl.Resource, findLabel(LabelResource, labels).GetValue())
-		assert.Equal(t, rl.AppName, findLabel(LabelName, labels).GetValue())
-		assert.Equal(t, rl.AppKind, findLabel(LabelType, labels).GetValue())
-		assert.Equal(t, rl.AppID, findLabel(LabelAppID, labels).GetValue())
-		assert.Equal(t, rl.AppInstallationID, findLabel(LabelAppInstallationID, labels).GetValue())
-	}
-
-	t.Run("sets total rate limit", func(t *testing.T) {
-		c := NewCollector(CollectorParams{})
-		reg := prometheus.NewRegistry()
-		reg.MustRegister(c.Collectors()...)
-
-		c.SetRateLimit(rl)
-
-		metrics, err := reg.Gather()
-		if err != nil {
-			fatal(t, err)
-		}
-
-		mf := findMetricFamily("gh_rate_limit_exporter_rate_limit_total", metrics)
-		m := mf.GetMetric()[0]
-
-		assert.Len(t, mf.GetMetric(), 1)
-		assertCorrectValueAndLabels(t, float64(rl.Limit), m)
-	})
-
-	t.Run("sets remaining rate limit", func(t *testing.T) {
-		c := NewCollector(CollectorParams{})
-		reg := prometheus.NewRegistry()
-		reg.MustRegister(c.Collectors()...)
-
-		c.SetRateLimitRemaining(rl)
-
-		metrics, err := reg.Gather()
-		if err != nil {
-			fatal(t, err)
-		}
-
-		mf := findMetricFamily("gh_rate_limit_exporter_rate_limit_remaining", metrics)
-		m := mf.GetMetric()[0]
-
-		assert.Len(t, mf.GetMetric(), 1)
-		assertCorrectValueAndLabels(t, float64(rl.Remaining), m)
-	})
-
-	t.Run("sets rate limit usage", func(t *testing.T) {
-		c := NewCollector(CollectorParams{})
-		reg := prometheus.NewRegistry()
-		reg.MustRegister(c.Collectors()...)
-
-		c.SetRateLimitUsage(rl)
-
-		metrics, err := reg.Gather()
-		if err != nil {
-			fatal(t, err)
-		}
-
-		mf := findMetricFamily("gh_rate_limit_exporter_rate_limit_usage", metrics)
-		m := mf.GetMetric()[0]
-
-		assert.Len(t, mf.GetMetric(), 1)
-		assertCorrectValueAndLabels(t, float64(0.5), m)
-	})
 }
 
 func generatePrivateKey(t *testing.T) string {

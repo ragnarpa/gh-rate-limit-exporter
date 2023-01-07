@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/ragnarpa/gh-rate-limit-exporter/logger"
@@ -98,13 +97,15 @@ type (
 
 	Collector struct {
 		credentials        []*Credential
-		rateLimit          *prometheus.GaugeVec
+		rateLimitTotal     *prometheus.GaugeVec
 		rateLimitRemaining *prometheus.GaugeVec
 		rateLimitUsage     *prometheus.GaugeVec
 		interval           *Interval
 		factory            RateLimitsServiceFactory
 		log                logger.Logger
-		once               sync.Once
+		mtx                sync.Mutex
+		ctx                context.Context
+		cancel             context.CancelFunc
 	}
 )
 
@@ -137,25 +138,70 @@ func NewCollector(p CollectorParams) *Collector {
 		labels,
 	)
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	return &Collector{
 		interval:           p.Interval,
 		credentials:        p.Credentials,
-		rateLimit:          rateLimit,
+		rateLimitTotal:     rateLimit,
 		rateLimitRemaining: rateLimitRemaining,
 		rateLimitUsage:     rateLimitUsage,
 		factory:            p.Factory,
 		log:                p.Log,
+		ctx:                ctx,
+		cancel:             cancel,
 	}
 }
 
-func (c *Collector) Collectors() []prometheus.Collector {
-	return []prometheus.Collector{c.rateLimit, c.rateLimitRemaining, c.rateLimitUsage}
+func (c *Collector) Shutdown() {
+	c.cancel()
 }
 
-func (c *Collector) SetRateLimit(rl *github.RateLimit) {
-	c.rateLimit.
+func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
+	c.rateLimitTotal.Describe(ch)
+	c.rateLimitRemaining.Describe(ch)
+	c.rateLimitUsage.Describe(ch)
+}
+
+func (c *Collector) Collect(ch chan<- prometheus.Metric) {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+
+	// Reset the metrics. If metrics collection
+	// should fail then we don't report possibly stale values.
+	c.rateLimitTotal.Reset()
+	c.rateLimitRemaining.Reset()
+	c.rateLimitUsage.Reset()
+
+	// Only collect if Done is not yet closed.
+	// The context may be closed by Shutdown().
+	// If the collector has been shut down then
+	// let the gatherer collect reset metrics only.
+	if c.ctx.Err() == nil {
+		c.collectAll(c.ctx)
+	}
+
+	c.rateLimitTotal.Collect(ch)
+	c.rateLimitRemaining.Collect(ch)
+	c.rateLimitUsage.Collect(ch)
+}
+
+func (c *Collector) setRateLimitTotal(rl *github.RateLimit) {
+	c.rateLimitTotal.
 		WithLabelValues(labels(rl)...).
 		Set(float64(rl.Limit))
+}
+
+func (c *Collector) setRateLimitRemaining(rl *github.RateLimit) {
+	c.rateLimitRemaining.
+		WithLabelValues(labels(rl)...).
+		Set(float64(rl.Remaining))
+}
+
+func (c *Collector) setRateLimitUsage(rl *github.RateLimit) {
+	c.rateLimitUsage.
+		WithLabelValues(labels(rl)...).
+		Set(float64(rl.Limit-rl.Remaining) / float64(rl.Limit))
 }
 
 func labels(rl *github.RateLimit) []string {
@@ -168,39 +214,7 @@ func labels(rl *github.RateLimit) []string {
 	}
 }
 
-func (c *Collector) SetRateLimitRemaining(rl *github.RateLimit) {
-	c.rateLimitRemaining.
-		WithLabelValues(labels(rl)...).
-		Set(float64(rl.Remaining))
-}
-
-func (c *Collector) SetRateLimitUsage(rl *github.RateLimit) {
-	c.rateLimitUsage.
-		WithLabelValues(labels(rl)...).
-		Set(float64(rl.Limit-rl.Remaining) / float64(rl.Limit))
-}
-
-func (c *Collector) Start(ctx context.Context) {
-	c.once.Do(
-		func() {
-			go func() {
-				ticker := time.NewTicker(time.Duration(*c.interval))
-
-				for {
-					select {
-					case <-ctx.Done():
-						ticker.Stop()
-						return
-					case <-ticker.C:
-						c.CollectAll(ctx)
-					}
-				}
-			}()
-		},
-	)
-}
-
-func (c *Collector) CollectAll(ctx context.Context) {
+func (c *Collector) collectAll(ctx context.Context) {
 	var wg sync.WaitGroup
 	wg.Add(len(c.credentials))
 	defer wg.Wait()
@@ -216,23 +230,23 @@ func (c *Collector) CollectAll(ctx context.Context) {
 
 		go func() {
 			defer wg.Done()
-			if err := c.CollectOne(ctx, rls); err != nil {
+			if err := c.collectOne(ctx, rls); err != nil {
 				c.log.Errorf("collector %v: %v", appName, err)
 			}
 		}()
 	}
 }
 
-func (c *Collector) CollectOne(ctx context.Context, rls RateLimitsService) error {
+func (c *Collector) collectOne(ctx context.Context, rls RateLimitsService) error {
 	limits, err := rls.RateLimits(ctx)
 	if err != nil {
 		return err
 	}
 
 	for _, rl := range limits {
-		c.SetRateLimit(rl)
-		c.SetRateLimitRemaining(rl)
-		c.SetRateLimitUsage(rl)
+		c.setRateLimitTotal(rl)
+		c.setRateLimitRemaining(rl)
+		c.setRateLimitUsage(rl)
 	}
 
 	return nil

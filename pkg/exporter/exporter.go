@@ -28,21 +28,9 @@ func Module() fx.Option {
 		),
 		fx.Invoke(
 			func(collector *Collector, lc fx.Lifecycle) {
-				// Do not use Fx provided OnStart and OnStop context.
-				// These contexts are only meant for controlling
-				// startup and shutdown processes which have their
-				// own timeouts. In our case, we want to start
-				// a long-running background process.
-				ctx, cancel := context.WithCancel(context.Background())
-
 				lc.Append(fx.Hook{
-					OnStart: func(context.Context) error {
-						collector.Start(ctx)
-
-						return nil
-					},
 					OnStop: func(context.Context) error {
-						cancel()
+						collector.Shutdown()
 
 						return nil
 					},

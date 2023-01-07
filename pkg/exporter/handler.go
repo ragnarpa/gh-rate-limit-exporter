@@ -12,7 +12,7 @@ type MetricsHandler struct {
 }
 
 func NewMetricsHandler(c *Collector, r *prometheus.Registry) *MetricsHandler {
-	r.MustRegister(c.Collectors()...)
+	r.MustRegister(c)
 
 	return &MetricsHandler{r}
 }
