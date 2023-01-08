@@ -62,7 +62,7 @@ func (s *InMemoryCredentialSource) Credentials() []*exporter.Credential {
 
 func main() {
 	fx.New(
-		// Replace the default implementation (credentials.json) provided by
+		// Replace the default implementation (credentials.yml) provided by
 		// gh-rate-limit-exporter with your own in-memory credential Source.
 		fx.Replace(
 			fx.Annotate(
@@ -105,3 +105,13 @@ Navigate to `http://localhost:8080/metrics` and after 30 seconds you should see 
 - gh_rate_limit_exporter_rate_limit_usage - (total - remaining) / total
 
 To find out how to scrape Prometheus metrics, please go [here](https://prometheus.io/docs/prometheus/latest/getting_started/).
+
+## Development
+
+```shell
+# With live-reloading (https://github.com/cosmtrek/air).
+air -c .air.toml
+# Open your favourite IDE and start coding ...
+# Trigger the collection.
+curl http://localhost:8080/metrics
+```

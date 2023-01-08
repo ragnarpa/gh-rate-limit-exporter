@@ -4,3 +4,4 @@ credentials.json
 credentials.yaml
 credentials.yml
 gh-rate-limit-exporter
+tmp/
