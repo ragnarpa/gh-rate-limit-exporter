@@ -1,6 +1,7 @@
 # gh-rate-limit-exporter
 
 ![Build & Test](https://github.com/ragnarpa/gh-rate-limit-exporter/actions/workflows/build-and-test.yml/badge.svg?branch=main&event=push)
+![CodeQL](https://github.com/ragnarpa/gh-rate-limit-exporter/actions/workflows/codeql.yml/badge.svg?branch=main&event=push)
 ![Build Image](https://github.com/ragnarpa/gh-rate-limit-exporter/actions/workflows/build-container-image.yml/badge.svg)
 
 The exporter you longed for to expose GitHub API rate limits as Prometheus metrics.
