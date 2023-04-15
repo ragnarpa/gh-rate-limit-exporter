@@ -6,6 +6,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  repository-projects: write
+
 jobs:
   publish:
     runs-on: ubuntu-latest
