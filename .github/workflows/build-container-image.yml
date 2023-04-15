@@ -7,7 +7,7 @@ on:
       - 'v*'
 
 permissions:
-  repository-projects: write
+  packages: write
 
 jobs:
   publish:
