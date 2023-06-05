@@ -38,7 +38,7 @@ require (
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/prometheus/client_golang v1.15.1
 	github.com/spf13/afero v1.9.5
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.8.4
 	golang.org/x/crypto v0.7.0 // indirect
 	golang.org/x/oauth2 v0.7.0
 )
